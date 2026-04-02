@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  database:
+    image: postgres:17
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=12345678Ab
+      - POSTGRES_USER=sa
+      - POSTGRES_DB=postgre
+    volumes:
+      - ${USERPROFILE}/postgres_data:/var/lib/postgresql/data
+
+  tokenizer:
+    build:
+      context: ./tokenizer
+      dockerfile: Dockerfile
+    hostname: tokenizer
+    restart: unless-stopped
+    ports:
+      - "57100:8000"

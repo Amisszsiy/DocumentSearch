@@ -21,3 +21,19 @@ services:
     restart: unless-stopped
     ports:
       - "57100:8000"
+
+  webapi:
+    build:
+      context: .
+      dockerfile: DocumentSearch/Dockerfile
+    hostname: webapi
+    restart: unless-stopped
+    ports:
+      - "5079:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres; Port=5432; Username=sa; Password=12345678Ab; Database=postgre
+      - ThaiTokenizer__BaseUrl=http://tokenizer:8000
+    depends_on:
+      - database
+      - tokenizer

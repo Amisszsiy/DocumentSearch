@@ -60,22 +60,29 @@ namespace DocumentSearch.Controllers
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostAsync([FromBody] DocumentIndexingRequest request)
+        public async Task<IActionResult> PostAsync([FromBody] DocumentIndexingRequest[] request)
         {
-            if (request == null)
+            if (request == null || request.Length == 0)
                 return BadRequest("Invalid request body");
 
             try
             {
-                request.Content = await _tokenizer.TokenizeAsync(request.Content);
-                request.FileName = await _tokenizer.TokenizeAsync(request.FileName);
-                Document document = new Document
+                var tasks = request.Select( async request =>
                 {
-                    Id = request.Id,
-                    Content = request.Content,
-                    FileName = request.FileName
-                };
-                _context.Documents.Add(document);
+                    request.Content = await _tokenizer.TokenizeAsync(request.Content);
+                    request.FileName = await _tokenizer.TokenizeAsync(request.FileName);
+                    Document document = new Document
+                    {
+                        Id = request.Id,
+                        Content = request.Content,
+                        FileName = request.FileName
+                    };
+                    return document;
+                });
+
+                var docs = await Task.WhenAll(tasks);
+
+                _context.Documents.AddRange(docs);
                 await _context.SaveChangesAsync();
 
                 return StatusCode(StatusCodes.Status201Created);

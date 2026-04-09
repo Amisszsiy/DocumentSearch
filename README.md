@@ -12,7 +12,7 @@ A multilingual document full-text search API built with ASP.NET Core 8 and Postg
 └─────────────────────┘     └──────────────────────┘     └──────────────────┘
 ```
 
-- Thai text is tokenized by PyThaiNLP (`newmm` engine) before indexing and querying
+- Thai text is tokenized by PyThaiNLP (`newmm` engine) before indexing and querying — batch tokenization is used for efficient multi-document ingestion
 - PostgreSQL `tsvector` with `simple` config and GIN index handles full-text search
 - Works with mixed-language content (Thai + English in the same document)
 
@@ -96,13 +96,15 @@ GET /api/document/{search}
 
 ---
 
-### Add a document
+### Add documents
 
 ```
 POST /api/document
 ```
 
-**Request body:**
+Accepts a single document or an array of documents. All `content` and `fileName` fields are batch-tokenized in two HTTP calls to the tokenizer sidecar regardless of how many documents are submitted.
+
+**Request body (single):**
 ```json
 {
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -110,6 +112,24 @@ POST /api/document
   "content": "เนื้อหาเอกสารภาษาไทย"
 }
 ```
+
+**Request body (batch):**
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "fileName": "report.pdf",
+    "content": "เนื้อหาเอกสารภาษาไทย"
+  },
+  {
+    "id": "7cb96a12-1234-4321-a1b2-3c4d5e6f7a8b",
+    "fileName": "summary.pdf",
+    "content": "สรุปเนื้อหา"
+  }
+]
+```
+
+**Response `201 Created`**
 
 ---
 
@@ -122,6 +142,42 @@ DELETE /api/document/{id}
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `id` | GUID (path) | Document ID to delete |
+
+## Tokenizer Sidecar API
+
+The tokenizer is a FastAPI service wrapping PyThaiNLP's `newmm` engine.
+
+### Single tokenize
+
+```
+POST /tokenize
+```
+
+```json
+// Request
+{ "text": "ข้อความภาษาไทย" }
+
+// Response
+{ "result": "ข้อความ ภาษา ไทย" }
+```
+
+### Batch tokenize
+
+```
+POST /tokenize/batch
+```
+
+Tokenizes multiple strings in one call. Results are returned in the same order as the input.
+
+```json
+// Request
+{ "texts": ["ข้อความภาษาไทย", "เนื้อหาเอกสาร"] }
+
+// Response
+{ "results": ["ข้อความ ภาษา ไทย", "เนื้อหา เอกสาร"] }
+```
+
+> The DocumentSearch API uses `/tokenize/batch` internally when indexing documents, keeping tokenizer round-trips constant at 2 regardless of batch size.
 
 ## Project Structure
 
@@ -149,7 +205,7 @@ DocumentSearch/
 └── Program.cs
 
 tokenizer/                       # Python tokenizer sidecar
-├── main.py                      # FastAPI app, POST /tokenize
+├── main.py                      # FastAPI app, POST /tokenize and POST /tokenize/batch
 ├── requirements.txt
 └── Dockerfile
 

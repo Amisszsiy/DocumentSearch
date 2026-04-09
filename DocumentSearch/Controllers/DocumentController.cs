@@ -67,20 +67,15 @@ namespace DocumentSearch.Controllers
 
             try
             {
-                var tasks = request.Select( async request =>
-                {
-                    request.Content = await _tokenizer.TokenizeAsync(request.Content);
-                    request.FileName = await _tokenizer.TokenizeAsync(request.FileName);
-                    Document document = new Document
-                    {
-                        Id = request.Id,
-                        Content = request.Content,
-                        FileName = request.FileName
-                    };
-                    return document;
-                });
+                var tokenizedContents = await _tokenizer.TokenizeBatchAsync(request.Select(r => r.Content).ToArray());
+                var tokenizedFileNames = await _tokenizer.TokenizeBatchAsync(request.Select(r => r.FileName).ToArray());
 
-                var docs = await Task.WhenAll(tasks);
+                var docs = request.Select((r, i) => new Document
+                {
+                    Id = r.Id,
+                    Content = tokenizedContents[i],
+                    FileName = tokenizedFileNames[i]
+                }).ToArray();
 
                 _context.Documents.AddRange(docs);
                 await _context.SaveChangesAsync();
